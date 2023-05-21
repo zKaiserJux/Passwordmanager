@@ -1,37 +1,64 @@
 import sqlite3
-import pwinput
+import getpass
 
-class Passwordmanger:
+class PasswordManger:
     def __init__(self):
-        self.masterkey = ""
-        self.password_list = []
-        self.active = True
+        self.master_key = ""
 
+    # Lässt den User einen Master-Key beim ersten Starten der Applikation festlegen und speichert diesen anschließend in der Datenbank
+    def set_masterkey(self):
+        self.master_key = getpass.getpass("* Legen Sie bitte einen Master-Key fest: ")
+        confirm_masterkey = getpass.getpass("* Bitte wiederholen Sie den Master-Key: ")
+        if confirm_masterkey != self.master_key:
+            print("Die eingegebenen Master-Keys stimmen nicht überein! \n Bitte wiederholen Sie den Vorgang.")
+            self.set_masterkey()
+
+    # Fragt den Nutzer nach einem neuen Account und erhält die Login-Daten mit samt der URL
     def get_credentials(self):
         url = input("* Name / URL: ")
         email_username = input("* email/username: ")
-        password = pwinput.pwinput(prompt="* Password: ", mask="*")
-        return url, email_username, password
+        password = getpass.getpass("* Password: ")
+        return url.strip(), email_username.strip(), password.strip()
 
     # Datenbank, die die Website als URL speichert, den Usernamen/E-Mail für einen Account und das dazugehörige Passwort
     def initialise_db(self):
-        # Die vom Nutzer eingegebene credentials für eine bestimmten Online-Account
-        url, email_username, password = self.get_credentials()
-
         # Verbindung zur Datenbank herstellen
         conn = sqlite3.connect('passwordmanager.db')
-        
+        cur = conn.cursor()
+
         # SQL-Befehl zum Erstellen der Datentabelle
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS passwords (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         url TEXT,
         email_username TEXT,
-        password TEXT
+        password TEXT,
+        master_key TEXT
         )
         '''
-        # Datenbank ersellen
-        conn.execute(create_table_query)
+        # Datenbank ersellen und Daten in die Tabelle einfügen
+        cur.execute(create_table_query)
+        check_master_key_query = '''
+        SELECT master_key FROM passwords LIMIT 1
+        '''
+        result = cur.execute(check_master_key_query)
+        stored_master_key = result.fetchone()
+
+        # Wenn kein Master-Key in der Datenbank gespeichert ist, wird ein Master-Key erstellt
+        if not stored_master_key:
+            self.set_masterkey()
+            
+            # SQL-Befehl zum Speichern des Master-Keys in der Datenbank
+            insert_master_key = '''
+            INSERT INTO passwords (master_key) VALUES (?)
+            '''
+            # Speicherung des Master-Keys in der Datenbank
+            cur.execute(insert_master_key, (self.master_key,))
+            conn.commit()
+            print("Der Master-Key wurde erfolgreich in der Datenbank gespeichert")
+
+        # Die vom Nutzer eingegebene credentials für eine bestimmten Online-Account
+        url, email_username, password = self.get_credentials()
 
         # SQL-Befehl zum Einfügen eines neuen Eintrages in die Tabelle
         insert_query = '''
@@ -39,26 +66,8 @@ class Passwordmanger:
         VALUES (?, ?, ?)
         '''
         # Eintrag in die Tabelle einfügen
-        conn.execute(insert_query, (url, email_username, password))
-
-        # Aenderungen in der Datenbank speichern
+        cur.execute(insert_query, (url, email_username, password))
         conn.commit()
-
-        # SQL-Befehl zum Abrufen aller Einträge in der Datenbank
-        select_query = '''
-        SELECT url, email_username, password
-        FROM passwords
-        '''
-
-        # Daten abrufen und in der Variable result speichern
-        result = conn.execute(select_query)
-
-        # Ereignisse anzeigen
-        for entry in result:
-            print("URL: ", entry[0])
-            print("email/username: ", entry[1])
-            print("password: ", entry[2])
 
         # Verbindung zur Datenbank schließen
         conn.close()
-            

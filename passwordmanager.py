@@ -1,9 +1,11 @@
 import sqlite3
 import getpass
+import sys
 
 class PasswordManger:
     def __init__(self):
         self.master_key = ""
+        self.logged_in_status = False
 
     # Lässt den User einen Master-Key beim ersten Starten der Applikation festlegen und speichert diesen anschließend in der Datenbank
     def set_masterkey(self):
@@ -14,11 +16,25 @@ class PasswordManger:
             self.set_masterkey()
 
     # Fragt den Nutzer nach einem neuen Account und erhält die Login-Daten mit samt der URL
-    def get_credentials(self):
+    def add_credentials(self):
         url = input("* Name / URL: ")
         email_username = input("* email/username: ")
         password = getpass.getpass("* Password: ")
-        return url.strip(), email_username.strip(), password.strip()
+
+        conn = sqlite3.connect("passwordmanager.db")
+        cur = conn.cursor()
+
+         # SQL-Befehl zum Einfügen eines neuen Eintrages in die Tabelle
+        insert_query = '''
+        INSERT INTO passwords (url, email_username, password)
+        VALUES (?, ?, ?)
+        '''
+        # Eintrag in die Tabelle einfügen
+        cur.execute(insert_query, (url, email_username, password))
+        conn.commit()
+
+        conn.close()
+
 
     # Datenbank, die die Website als URL speichert, den Usernamen/E-Mail für einen Account und das dazugehörige Passwort
     def initialise_db(self):
@@ -57,17 +73,24 @@ class PasswordManger:
             conn.commit()
             print("Der Master-Key wurde erfolgreich in der Datenbank gespeichert")
 
-        # Die vom Nutzer eingegebene credentials für eine bestimmten Online-Account
-        url, email_username, password = self.get_credentials()
-
-        # SQL-Befehl zum Einfügen eines neuen Eintrages in die Tabelle
-        insert_query = '''
-        INSERT INTO passwords (url, email_username, password)
-        VALUES (?, ?, ?)
-        '''
-        # Eintrag in die Tabelle einfügen
-        cur.execute(insert_query, (url, email_username, password))
-        conn.commit()
+        # if a master key already exists the user has to login
+        else:
+            tries = 0
+            max_attempts = 3
+            while tries < max_attempts:
+                user_masterkey = getpass.getpass("Please enter your master-key to login: ")
+                if user_masterkey == stored_master_key[0]:
+                    self.logged_in_status = True
+                    print("Login successfull.")
+                    break
+                
+                else:
+                    tries += 1
+                    remaining_attempts = 3 - tries
+                    print(f"The master key is incorrect! You only have {remaining_attempts} attempt/s left.")
+            if not self.logged_in_status:
+                print("Too many tries. Access will be denied!")
+                sys.exit(0)
 
         # Verbindung zur Datenbank schließen
         conn.close()

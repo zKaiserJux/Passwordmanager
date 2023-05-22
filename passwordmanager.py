@@ -1,11 +1,13 @@
 import sqlite3
 import getpass
 import sys
+from crypto import encrypt_master_key, generate_encryption_key, encrypt_password
 
 class PasswordManger:
     def __init__(self):
         self.master_key = ""
         self.logged_in_status = False
+        self.encryption_key = None
 
     # Lässt den User einen Master-Key beim ersten Starten der Applikation festlegen und speichert diesen anschließend in der Datenbank
     def set_masterkey(self):
@@ -14,12 +16,15 @@ class PasswordManger:
         if confirm_masterkey != self.master_key:
             print("Die eingegebenen Master-Keys stimmen nicht überein! \n Bitte wiederholen Sie den Vorgang.")
             self.set_masterkey()
+        # encryption of the master key
+        self.master_key = encrypt_master_key(self.master_key)
 
     # Fragt den Nutzer nach einem neuen Account und erhält die Login-Daten mit samt der URL
     def add_credentials(self):
         url = input("* Name / URL: ")
         email_username = input("* email/username: ")
         password = getpass.getpass("* Password: ")
+        password = encrypt_password(password, self.encryption_key)
 
         conn = sqlite3.connect("passwordmanager.db")
         cur = conn.cursor()
@@ -42,6 +47,10 @@ class PasswordManger:
         conn = sqlite3.connect('passwordmanager.db')
         cur = conn.cursor()
 
+        # key zum Ver- und Entschlüsseln der Passwörter wird initialisiert und in einer Datei namens encrypted_key.txt gespeichert
+        # Der key wird mit dem Master-Key verschlüsselt
+        self.encryption_key = generate_encryption_key()
+
         # SQL-Befehl zum Erstellen der Datentabelle
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS passwords (
@@ -60,9 +69,10 @@ class PasswordManger:
         result = cur.execute(check_master_key_query)
         stored_master_key = result.fetchone()
 
-        # Wenn kein Master-Key in der Datenbank gespeichert ist, wird ein Master-Key erstellt
+        # Wenn kein Master-Key in der Datenbank gespeichert ist, wird ein Master-Key erstellt und anschließend gehashed
         if not stored_master_key:
             self.set_masterkey()
+            encrypt_master_key()
             
             # SQL-Befehl zum Speichern des Master-Keys in der Datenbank
             insert_master_key = '''

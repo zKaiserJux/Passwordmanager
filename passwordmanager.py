@@ -72,13 +72,12 @@ class PasswordManger:
         # Wenn kein Master-Key in der Datenbank gespeichert ist, wird ein Master-Key erstellt und anschließend gehashed
         if not stored_master_key:
             self.set_masterkey()
-            encrypt_master_key()
             
             # SQL-Befehl zum Speichern des Master-Keys in der Datenbank
             insert_master_key = '''
             INSERT INTO passwords (master_key) VALUES (?)
             '''
-            # Speicherung des Master-Keys in der Datenbank
+            # Speicherung des gehashten Master-Keys in der Datenbank
             cur.execute(insert_master_key, (self.master_key,))
             conn.commit()
             print("Der Master-Key wurde erfolgreich in der Datenbank gespeichert")

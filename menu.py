@@ -6,7 +6,7 @@ def menu():
     user_command = input("Choose a command [(g)et / (s)earh / show (all) / (a)dd / (q)uit]: ")
     # user can get the credentails for an account
     if user_command == "g":
-        pass
+        pm.PasswordManger.get_credentials()
 
     # user can search for an account if it exists
     elif user_command == "s":

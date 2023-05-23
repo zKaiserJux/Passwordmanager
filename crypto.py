@@ -2,6 +2,7 @@ from cryptography.fernet import Fernet
 import bcrypt
 import base64
 import hashlib
+import os
 
 # encrypts the master key and returns it decoded
 def encrypt_master_key(master_key : str):
@@ -10,12 +11,14 @@ def encrypt_master_key(master_key : str):
     hashed = bcrypt.hashpw(master_key, bcrypt.gensalt())
     return hashed.decode()
 
-# generates the encryption key
-def generate_encryption_key():
-    return Fernet.generate_key()
+# generates the encryption key and saves it in a file
+def generate_encryption_key(key_file : str):
+    key = Fernet.generate_key()
+    with open(key_file, "wb") as file:
+        file.write(key)
 
 # encrypts the encryption key an saves it in a file
-def encrypt_encryption_key(master_key : str, encryption_key : bytes):
+def encrypt_encryption_key(master_key : str, encryption_key : bytes, key_file : str):
     master_key = master_key.encode("utf-8")
 
     # use the master key to derive the key for the encryption key
@@ -26,9 +29,20 @@ def encrypt_encryption_key(master_key : str, encryption_key : bytes):
     encrypted_encryption_key = cipher_suite.encrypt(encryption_key)
 
     # save the encrypted encryption key in a file
-    with open("encrypted_key.txt", "wb") as file:
+    with open(key_file, "wb") as file:
         file.write(encrypted_encryption_key)
     
+    return encrypted_encryption_key
+    
+# decrypts the encryption key and returns it decoded
+def decrypt_encryption_key(master_key : bytes, key_file : str):
+    if os.path.isfile(key_file):
+        # if file with the master_key exists read the file and extract the encrypted encryption key
+        with open(key_file) as file:
+            encrypted_key = file.read().strip().encode("utf-8")
+        cipher_suite = Fernet(master_key)
+        decrypted_encryption_key = cipher_suite.decrypt(encrypted_key)
+        return decrypted_encryption_key
 
 # encrypts a passwort with the encryption key
 def encrypt_password(password : str, encryption_key : bytes):

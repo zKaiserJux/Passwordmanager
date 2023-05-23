@@ -4,14 +4,14 @@ from base64 import b64encode
 from hashlib import sha256
 import sys
 import os
-from crypto import encrypt_master_key, generate_encryption_key, encrypt_password
+from crypto import encrypt_master_key, generate_encryption_key, encrypt_password, decrypt_password, generate_encryption_key
 from bcrypt import checkpw
-from cryptography.fernet import Fernet
 
 class PasswordManger:
     def __init__(self):
         self.master_key = ""
         self.master_key_file = "master_key.txt"
+        self.encryption_key_file = "encryption_key.txt"
         self.logged_in_status = False
         self.encryption_key = None
 
@@ -37,6 +37,13 @@ class PasswordManger:
                 self.master_key = file.read().strip()
         else:
             return None
+        
+    # Holt sich den encryption key bei der Ver- und Entschlüsselung von Passwörtern
+    def get_encryption_key(self):
+        if os.path.isfile(self.encryption_key_file):
+            with open(self.encryption_key_file, "r") as file:
+                self.encryption_key = file.read().strip()
+        return self.encryption_key
         
     # Wird aufgerufen, wenn ein Master-Key bereits existiert und sich der User mit diesem anmleden muss
     def user_login(self):
@@ -65,6 +72,7 @@ class PasswordManger:
             
     # Fragt den Nutzer nach einem neuen Account und erhält die Login-Daten mit samt der URL
     def add_credentials(self):
+        self.encryption_key = self.get_encryption_key().encode("utf-8")
         url = input("* Name / URL: ")
         email_username = input("* email/username: ")
         password = getpass.getpass("* Password: ")
@@ -89,6 +97,8 @@ class PasswordManger:
         # Wenn keine master_key Datei existiert, wird set_masterkey ausgeführt
         if not os.path.isfile(self.master_key_file):
             self.set_masterkey()
+            # key zum Ver- und Entschlüsseln der Passwörter wird initialisiert
+            generate_encryption_key(self.encryption_key_file)
 
         # Wenn ja, dann muss sich der User einloggen
         else:
@@ -98,9 +108,8 @@ class PasswordManger:
         conn = sqlite3.connect('passwordmanager.db')
         cur = conn.cursor()
 
-        # key zum Ver- und Entschlüsseln der Passwörter wird initialisiert und in einer Datei namens encrypted_key.txt gespeichert
-        # Der key wird mit dem Master-Key verschlüsselt
-        self.encryption_key = generate_encryption_key()
+        # Der key wird mit dem Master-Key verschlüsselt und in der Datei "encryption_key.txt" gespeichert
+        # self.encryption_key = encrypt_encryption_key(self.master_key, self.encryption_key, self.encryption_key_file)
 
         # SQL-Befehl zum Erstellen der Datentabelle
         create_table_query = '''
@@ -116,3 +125,27 @@ class PasswordManger:
         
         # Verbindung zur Datenbank schließen
         conn.close()
+
+    # Zeigt dem Nutzer bei Eingabe des chars "g" das Password für einen jeweiligen Account
+    def get_credentials(self):
+        # Nutzer wird nach der spezifischen Website geafragt auf dem er den Account angelegt hat
+        account = input("* Geben Sie die Seite ein auf dem Sie den Account erstellt haben: ")
+
+        # Verbindung mit der Datenbank wird aufgebaut
+        conn = sqlite3.connect("passwordmanager.db")
+        cur = conn.cursor()
+
+        # Datenbank wird nach der Website durchsucht
+        cur.execute("SELECT email_username, password FROM passwords WHERE url = ? ", (account,))
+        result = cur.fetchone()
+
+        # Falls eine Zeile mit Daten gefunden wurde, werden die credentials für den Account ausgegeben
+        if result is not None:
+            # self.encryption_key = decrypt_encryption_key(self.master_key.encode("utf-8"), self.encryption_key_file)
+            self.encryption_key = self.get_encryption_key()
+            password = decrypt_password(result[1], self.encryption_key)
+            print(f"[+] Benutzername: {result[0]}, Passwort: {password}")
+
+        # Wenn kein Eintrag gefunden werden konnte, wird dem Nutzer ein entsprechender Hinweis ausgegeben
+        else:
+            print("[-] Es existiert kein Account auf der von Ihnen angegebenen Plattform.")

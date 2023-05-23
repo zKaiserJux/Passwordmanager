@@ -9,7 +9,7 @@ def encrypt_master_key(master_key : str):
     master_key = master_key.encode("utf-8")
     master_key = base64.b64encode(hashlib.sha256(master_key).digest())
     hashed = bcrypt.hashpw(master_key, bcrypt.gensalt())
-    return hashed.decode()
+    return hashed
 
 # generates the encryption key and saves it in a file
 def generate_encryption_key(key_file : str):
@@ -19,8 +19,6 @@ def generate_encryption_key(key_file : str):
 
 # encrypts the encryption key an saves it in a file
 def encrypt_encryption_key(master_key : str, encryption_key : bytes, key_file : str):
-    master_key = master_key.encode("utf-8")
-
     # use the master key to derive the key for the encryption key
     derived_key = bcrypt.kdf(master_key, salt=bcrypt.gensalt(), desired_key_bytes=32, rounds=100)
     cipher_suite = Fernet(base64.b64encode(derived_key))
@@ -32,7 +30,7 @@ def encrypt_encryption_key(master_key : str, encryption_key : bytes, key_file : 
     with open(key_file, "wb") as file:
         file.write(encrypted_encryption_key)
     
-    return encrypted_encryption_key
+    return derived_key
     
 # decrypts the encryption key and returns it decoded
 def decrypt_encryption_key(master_key : bytes, key_file : str):
@@ -40,7 +38,7 @@ def decrypt_encryption_key(master_key : bytes, key_file : str):
         # if file with the master_key exists read the file and extract the encrypted encryption key
         with open(key_file) as file:
             encrypted_key = file.read().strip().encode("utf-8")
-        cipher_suite = Fernet(master_key)
+        cipher_suite = Fernet(base64.urlsafe_b64encode(master_key))
         decrypted_encryption_key = cipher_suite.decrypt(encrypted_key)
         return decrypted_encryption_key
 

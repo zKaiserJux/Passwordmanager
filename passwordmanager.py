@@ -6,6 +6,7 @@ import sys
 import os
 from crypto import hash_master_key, generate_encryption_key, encrypt_password, decrypt_password, generate_encryption_key, generate_encryption_key, decrypt_encryption_key
 from bcrypt import checkpw
+from tabulate import tabulate
 
 class PasswordManger:
     def __init__(self):
@@ -75,35 +76,12 @@ class PasswordManger:
         if not self.logged_in_status:
             print("[-] Sie haben zu viele Verusche benötigt. Zugang verweigert!")
             sys.exit()
-            
-    # Fragt den Nutzer nach einem neuen Account und erhält die Login-Daten mit samt der URL
-    def add_credentials(self):
-        url = input("* Name / URL: ")
-        email_username = input("* email/username: ")
-        password = getpass.getpass("* Password: ")
-
-        # Holen des entschlüsselten encryption keys mit dem die Passwörter verschlüsselt werden
-        # self.decrypted_encryption_key = self.get_decrypted_encryption_key()
-        password = encrypt_password(password, self.decrypted_encryption_key)
-
-        # Verbinden mit der Datenbank, um die eingebenen credentials in die Datenbank aufzunehmen
-        conn = sqlite3.connect("passwordmanager.db")
-        cur = conn.cursor()
-
-        # Credentials werden in die Tabelle eingefügt
-        cur.execute("INSERT INTO passwords (url, email_username, password) VALUES (?, ?, ?)", (url, email_username, password))
-        conn.commit()
-
-        # Verbindung mit der Datenbank wird beendet
-        conn.close()
 
     # Initialisierung der Datenbank, die später die Credentials aller Online-Accounts speichert
     def initialise_db(self):
         # Wenn keine master_key Datei existiert, wird set_masterkey ausgeführt
         if not os.path.isfile(self.master_key_file):
             self.set_masterkey()
-            # key zum Ver- und Entschlüsseln der Passwörter wird generiert
-            # generate_encryption_key(self.master_key, self.encryption_key_file)
 
         # Wenn ja, dann muss sich der User einloggen
         else:
@@ -147,10 +125,51 @@ class PasswordManger:
 
         # Falls eine Zeile mit Daten gefunden wurde, werden die credentials für den Account ausgegeben
         if result is not None:
-            # self.encryption_key = decrypt_encryption_key(self.master_key.encode("utf-8"), self.encryption_key_file)
             password = decrypt_password(result[1], self.decrypted_encryption_key)
             print(f"[+] Benutzername: {result[0]}, Passwort: {password}")
 
         # Wenn kein Eintrag gefunden werden konnte, wird dem Nutzer ein entsprechender Hinweis ausgegeben
         else:
             print("[-] Es existiert kein Account auf der von Ihnen angegebenen Plattform.")
+
+    # Zeigt dem Nutzer die komplette Datenbank
+    def show_all(self):
+        # Stellt die Verbindung zur Datenbank her
+        conn = sqlite3.connect("passwordmanager.db")
+        cur = conn.cursor()
+
+        # Datenbank wird Zeile für Zeile durchlaufen und als Tupel von Tupeln in entries gespeichert
+        cur.execute("SELECT * FROM passwords")
+        entries = cur.fetchall()
+
+        # Das Passwort jedes Eintrages muss vor dem printen noch mit dem encryption key entschlüsselt werden
+        for entry in entries:
+            entry[2] = decrypt_password(entry[2], self.decrypted_encryption_key)
+
+        # Ausgabe der gesamten Werte
+        table = tabulate(entries, headers=["website", "username/email", "password"], tablefmt="simple_grid")
+        print(table)
+
+        # Verbindung mit der Datenbank wird getrennt
+        conn.close()
+
+    # Fragt den Nutzer nach einem neuen Account und erhält die Login-Daten mit samt der URL
+    def add_credentials(self):
+        url = input("* Name / URL: ")
+        email_username = input("* email/username: ")
+        password = getpass.getpass("* Password: ")
+
+        # Holen des entschlüsselten encryption keys mit dem die Passwörter verschlüsselt werden
+        # self.decrypted_encryption_key = self.get_decrypted_encryption_key()
+        password = encrypt_password(password, self.decrypted_encryption_key)
+
+        # Verbinden mit der Datenbank, um die eingebenen credentials in die Datenbank aufzunehmen
+        conn = sqlite3.connect("passwordmanager.db")
+        cur = conn.cursor()
+
+        # Credentials werden in die Tabelle eingefügt
+        cur.execute("INSERT INTO passwords (url, email_username, password) VALUES (?, ?, ?)", (url, email_username, password))
+        conn.commit()
+
+        # Verbindung mit der Datenbank wird beendet
+        conn.close()

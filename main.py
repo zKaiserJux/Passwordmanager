@@ -8,10 +8,12 @@ if __name__ == "__main__":
     manager = pm.PasswordManger()
 
     # runs the initialise_db class, if the database does not exist yet
-    if os.path.isfile("passwordmanager.db"):
+    if not os.path.isfile("passwordmanager.db"):
         manager.initialise_db()
+        while manager.logged_in_status:
+            run(manager)
     # if so the user will be asked to login
     else:
         manager.user_login()
         while manager.logged_in_status:
-            run()
+            run(manager)

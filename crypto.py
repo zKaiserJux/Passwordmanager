@@ -38,17 +38,18 @@ def generate_encryption_key(hashed_master_key : bytes, key_file : str):
 
     return derived_key, encrypted_encryption_key
 
-# decrypts the encryption key and returns it decoded
-def decrypt_encryption_key(derived_key_file : str, encrypted_key : bytes):
-    # if file with the derived_key exists read the file and extract the encrypted encryption key
-    if os.path.isfile(derived_key_file):
-        with open(derived_key_file, "rb") as file:
-            derived_key = file.read()
-    
+# decrypts the encryption key and returns it
+def decrypt_encryption_key(derived_key : bytes, encrypted_key : bytes):
         # use the derived key to decrypt the encrypted encryption key
         cipher_suite = Fernet(base64.urlsafe_b64encode(derived_key))
         decrypted_encryption_key = cipher_suite.decrypt(encrypted_key)
         return decrypted_encryption_key
+    
+# encrypts the encryption key if the passwordmanager gets locked
+def encrypt_encryption_key(derived_key : bytes, decrypted_key : bytes):
+    cipher_suite = Fernet(base64.urlsafe_b64encode(derived_key))
+    encrypted_key = cipher_suite.encrypt(decrypted_key)
+    return encrypted_key
 
 # encrypts a passwort with the decrypted encryption key
 def encrypt_password(password : str, decrypted_encryption_key : bytes):

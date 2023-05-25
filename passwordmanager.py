@@ -4,7 +4,7 @@ from base64 import b64encode
 from hashlib import sha256
 import sys
 import os
-from crypto import hash_master_key, generate_encryption_key, encrypt_password, decrypt_password, generate_encryption_key, generate_encryption_key, decrypt_encryption_key
+from crypto import hash_master_key, generate_encryption_key, encrypt_password, decrypt_password, generate_encryption_key, generate_encryption_key, decrypt_encryption_key, encrypt_encryption_key
 from bcrypt import checkpw
 from tabulate import tabulate
 
@@ -48,8 +48,15 @@ class PasswordManger:
             return None
         
     # Gibt den entschlüsselten encryption zurück
-    def get_decrypted_encryption_key(self, encrypted_key):
-        self.decrypted_encryption_key = decrypt_encryption_key("derived_key.txt", encrypted_key)
+    def get_decrypted_encryption_key(self):
+        # Wenn die Datei mit dem verschlüsselten Key existiert, wird diese geöffnet und der Schlüssel extrahiert
+        if os.path.isfile(self.encryption_key_file):
+            with open(self.encryption_key_file, "rb") as file:
+                self.encryption_key = file.read()
+
+        # Holt sich den abgeleiteten Schlüssel, um den verschlüsselten encryption key zu entschlüsseln
+        self.derived_key = self.get_derived_key()
+        self.decrypted_encryption_key = decrypt_encryption_key(self.derived_key, self.encryption_key)
         return self.decrypted_encryption_key
         
     # Wird aufgerufen, wenn ein Master-Key bereits existiert und sich der User mit diesem anmleden muss
@@ -59,11 +66,17 @@ class PasswordManger:
 
         # Solange die maximalen Versuche noch nicht überschritten sind, wird dem User die Möglichkeit gegeben den Master-Key nocheinmal einzugeben
         while tries < max_attempts:
+            # Holt sich den gehasten Master-Key aus der Datei self.master_key.txt zur Überprüfung mit dem vom Nutzer eingegebenen Passwort
             self.get_masterkey()
             user_input = getpass.getpass("Bitte geben Sie den Master-Key ein, um sich einzuloggen: ")
             user_input = user_input.encode("utf-8")
             user_input = b64encode(sha256(user_input).digest())
             if checkpw(user_input, self.master_key):
+                # Lade die für die Sitzung benötigten Variablen in den Arbeitsspeicher
+                self.derived_key = self.get_derived_key()
+                self.decrypted_encryption_key = self.get_decrypted_encryption_key()
+
+                # Ändere den Login-Status auf True
                 self.logged_in_status = True
                 print("[+] Login successfull.")
                 break
@@ -79,22 +92,17 @@ class PasswordManger:
 
     # Initialisierung der Datenbank, die später die Credentials aller Online-Accounts speichert
     def initialise_db(self):
-        # Wenn keine master_key Datei existiert, wird set_masterkey ausgeführt
-        if not os.path.isfile(self.master_key_file):
-            self.set_masterkey()
+        # Master-Key wird erstellt
+        self.set_masterkey()
+        self.logged_in_status = True
 
-        # Wenn ja, dann muss sich der User einloggen
-        else:
-            self.user_login()
+        # Der key wird mit dem Master-Key verschlüsselt und in der Datei "encryption_key.txt" gespeichert
+        self.derived_key, self.encryption_key = generate_encryption_key(self.master_key, self.encryption_key_file)
+        self.decrypted_encryption_key = self.get_decrypted_encryption_key()
 
         # Verbindung zur Datenbank herstellen
         conn = sqlite3.connect('passwordmanager.db')
         cur = conn.cursor()
-
-        # Der key wird mit dem Master-Key verschlüsselt und in der Datei "encryption_key.txt" gespeichert
-        self.derived_key, self.encryption_key = generate_encryption_key(self.master_key, self.encryption_key_file)
-        self.decrypted_encryption_key = self.get_decrypted_encryption_key(self.encryption_key)
-
         # SQL-Befehl zum Erstellen der Datentabelle
         create_table_query = '''
         CREATE TABLE IF NOT EXISTS passwords (
@@ -142,12 +150,17 @@ class PasswordManger:
         cur.execute("SELECT * FROM passwords")
         entries = cur.fetchall()
 
+        # Liste in der die Einträge mit den enschlüsselten Passwörter gespeichert werden, da sich die Einträge in einem Tupel nicht ändern lassen
+        decrypted_entries = []
+
         # Das Passwort jedes Eintrages muss vor dem printen noch mit dem encryption key entschlüsselt werden
         for entry in entries:
-            entry[2] = decrypt_password(entry[2], self.decrypted_encryption_key)
+            decrypted_password = decrypt_password(entry[3], self.decrypted_encryption_key)
+            decrypted_entry = (entry[1], entry[2], decrypted_password)
+            decrypted_entries.append(decrypted_entry)
 
         # Ausgabe der gesamten Werte
-        table = tabulate(entries, headers=["website", "username/email", "password"], tablefmt="simple_grid")
+        table = tabulate(decrypted_entries, headers=["website", "username/email", "password"], tablefmt="simple_grid")
         print(table)
 
         # Verbindung mit der Datenbank wird getrennt
@@ -160,7 +173,6 @@ class PasswordManger:
         password = getpass.getpass("* Password: ")
 
         # Holen des entschlüsselten encryption keys mit dem die Passwörter verschlüsselt werden
-        # self.decrypted_encryption_key = self.get_decrypted_encryption_key()
         password = encrypt_password(password, self.decrypted_encryption_key)
 
         # Verbinden mit der Datenbank, um die eingebenen credentials in die Datenbank aufzunehmen
@@ -173,3 +185,9 @@ class PasswordManger:
 
         # Verbindung mit der Datenbank wird beendet
         conn.close()
+
+    # Verschlüsselt den Verschlüsselungsschlüssel
+    def lock(self):
+        # Verschlüsselt den Verschlüsselungsschlüssel mit dem abgeleiteten Schlüssel
+        encrypt_encryption_key(self.derived_key, self.decrypted_encryption_key)
+        self.logged_in_status = False

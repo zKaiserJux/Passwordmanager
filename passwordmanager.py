@@ -140,6 +140,27 @@ class PasswordManger:
         else:
             print("[-] Es existiert kein Account auf der von Ihnen angegebenen Plattform.")
 
+    # Gibt True zurück, falls ein Account mit der gegebenen URL existiert
+    def search(self):
+        url = input("* Bitte geben Sie die URL ein nach der Sie suchen: ")
+
+        # Verbindung mit der Datenbank aufbauen
+        conn = sqlite3.connect("passwordmanager.db")
+        cur = conn.cursor()
+
+        # Geht die Einträge der Datenbank durch und vergleicht die URL mit der eingegebenen
+        cur.execute("SELECT url FROM passwords WHERE url = ? ", (url,))
+        entries = cur.fetchone()
+        for entry in entries:
+            if entry == url:
+                print("[+] Mit der eingegebenen URL existiert ein Account")
+                return True
+        conn.close()
+
+        # Wenn kein Eintrag gefunden wurde dessen URL mit der eingegebenen übereinstimmt, dann wird False zurückgegeben
+        print("[-] Mit der eingegebenen URL existiert kein Account in der Datenbank")
+
+
     # Zeigt dem Nutzer die komplette Datenbank
     def show_all(self):
         # Stellt die Verbindung zur Datenbank her

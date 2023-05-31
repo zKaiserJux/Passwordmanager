@@ -2,7 +2,6 @@ from cryptography.fernet import Fernet
 import bcrypt
 import base64
 import hashlib
-import os
 
 # hashes the master key and saves it in a file
 def hash_master_key(master_key : str, master_key_file : str):

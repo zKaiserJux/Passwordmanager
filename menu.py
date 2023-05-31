@@ -12,7 +12,7 @@ def run(manager):
 
     # user can search for an account if it exists
     elif user_command == "s":
-        pm.PasswordManger.get_credentials(manager)
+        pm.PasswordManger.search(manager)
 
     # shows the user all the stored credentials in the database
     elif user_command == "all":

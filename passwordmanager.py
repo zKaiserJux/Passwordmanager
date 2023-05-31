@@ -140,27 +140,26 @@ class PasswordManger:
         else:
             print("[-] Es existiert kein Account auf der von Ihnen angegebenen Plattform.")
 
-    # Gibt True zurück, falls ein Account mit der gegebenen URL existiert
+    # sucht nach einem in der Datenbank angelegten Account und gibt eine positive Rückmeldung wieder, wenn dieser gefunden wurde
     def search(self):
-        url = input("* Bitte geben Sie die URL ein nach der Sie suchen: ")
+        user_url = input("* Bitte geben Sie die URL ein nach der Sie die Datenbank durchsuchen möchten: ")
 
-        # Verbindung mit der Datenbank aufbauen
+        # Aufbauen einer Verbingung mit der Datenbank
         conn = sqlite3.connect("passwordmanager.db")
         cur = conn.cursor()
 
-        # Geht die Einträge der Datenbank durch und vergleicht die URL mit der eingegebenen
-        cur.execute("SELECT url FROM passwords WHERE url = ? ", (url,))
-        entries = cur.fetchone()
-        for entry in entries:
-            if entry == url:
-                print("[+] Mit der eingegebenen URL existiert ein Account")
-                return True
-        conn.close()
+        # Datenbank wird nach dem vom User eingegebenen Input durchsucht
+        cur.execute("SELECT url FROM passwords WHERE url = ? ", (user_url,))
+        result = cur.fetchone()
 
-        # Wenn kein Eintrag gefunden wurde dessen URL mit der eingegebenen übereinstimmt, dann wird False zurückgegeben
-        print("[-] Mit der eingegebenen URL existiert kein Account in der Datenbank")
-
-
+        # Falls ein Account gefunden wurde, wird dem User eine gewisse Rückmeldung ausgegeben
+        if result is not None:
+            conn.close()
+            return True
+        else:
+            conn.close()
+            return False
+        
     # Zeigt dem Nutzer die komplette Datenbank
     def show_all(self):
         # Stellt die Verbindung zur Datenbank her
@@ -170,6 +169,8 @@ class PasswordManger:
         # Datenbank wird Zeile für Zeile durchlaufen und als Tupel von Tupeln in entries gespeichert
         cur.execute("SELECT * FROM passwords")
         entries = cur.fetchall()
+
+        conn.close()
 
         # Liste in der die Einträge mit den enschlüsselten Passwörter gespeichert werden, da sich die Einträge in einem Tupel nicht ändern lassen
         decrypted_entries = []
@@ -206,6 +207,31 @@ class PasswordManger:
 
         # Verbindung mit der Datenbank wird beendet
         conn.close()
+
+    # Löscht einen Eintrag aus der Datenbank
+    def delete_credentials(self):
+        desired_entry = input("* Bitte geben Sie die URL des Accounts ein, der aus der Datenbank entfernt werden soll: ")
+
+        # Verbindung mit der Datenbank wird aufgebaut
+        conn = sqlite3.connect("passwordmanager.db")
+        cur = conn.cursor()
+
+        # Es wird nach dem gewünschten Account in der Datenbank gesucht und dieser wird anschließend gelöscht
+        cur.execute("SELECT url, email_username, password FROM passwords WHERE url = ? ", (desired_entry,))
+        result = cur.fetchone()
+
+        if result is not None:
+            print(f"Folgender Account wurde gefunden: \nURL: {result[0]}, Email/Benutzername: {result[1]}, Passwort: {decrypt_password(result[2], self.decrypted_encryption_key)}")
+            decision = input("* Wollen Sie diesen Account wirklich löschen ? (j/n) ")
+            if decision == "j":
+                cur.execute("DELETE FROM passwords WHERE url = ?", (desired_entry,))
+                conn.commit()
+                print("[+] Der Account wurde erfolgreich aus der Datenbank entfernt")
+
+            else:
+                print("* Der Account bleibt weiterhin in der Datenbank enthalten")
+        else:
+            print("[-] Es wurde kein Account mit der angegebenen URL in der Datenbank gefunden")
 
     # Verschlüsselt den Verschlüsselungsschlüssel
     def lock(self):

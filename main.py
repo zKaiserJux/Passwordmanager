@@ -1,5 +1,4 @@
 import passwordmanager as pm
-from cryptography.fernet import Fernet
 import os
 from menu import run
 
